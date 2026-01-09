@@ -13,14 +13,24 @@ from app.services.payment_service import PaymentService
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown"""
     # Startup
+    import sys
+    print("[LIFESPAN] Starting lifespan...", file=sys.stderr, flush=True)
+
     api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    port = os.getenv("PORT", "8000")
+    print(f"[LIFESPAN] PORT={port}", file=sys.stderr, flush=True)
+    print(f"[LIFESPAN] OPENROUTER_API_KEY set: {bool(api_key)}", file=sys.stderr, flush=True)
+
     if not api_key:
         print("[WARNING] OPENROUTER_API_KEY not set - LLM features will be disabled")
 
+    print("[LIFESPAN] Creating PaymentService...", file=sys.stderr, flush=True)
     payment_service = PaymentService(api_key=api_key)
+    print("[LIFESPAN] PaymentService created", file=sys.stderr, flush=True)
+
     set_payment_service(payment_service)
 
-    print("[INFO] Payment Reconciliation Service started")
+    print("[INFO] Payment Reconciliation Service started", file=sys.stderr, flush=True)
     yield
 
     # Shutdown
