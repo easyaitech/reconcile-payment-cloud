@@ -2,9 +2,7 @@
 Payment Service - Orchestrates the entire reconciliation workflow
 """
 from typing import Dict, Any, Optional
-from app.services.file_checker import FileCheckerService
 from app.services.reconcile_service import ReconcileService
-from app.services.claude_service import ClaudeService
 
 
 class PaymentService:
@@ -14,9 +12,25 @@ class PaymentService:
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.file_checker = FileCheckerService(api_key)
+        self.api_key = api_key
         self.reconcile = ReconcileService()
-        self.claude = ClaudeService(api_key)
+        # LLM services are optional - initialized on demand
+        self._file_checker = None
+        self._claude = None
+
+    @property
+    def file_checker(self):
+        if self._file_checker is None:
+            from app.services.file_checker import FileCheckerService
+            self._file_checker = FileCheckerService(self.api_key)
+        return self._file_checker
+
+    @property
+    def claude(self):
+        if self._claude is None:
+            from app.services.claude_service import ClaudeService
+            self._claude = ClaudeService(self.api_key)
+        return self._claude
 
     async def execute(
         self,
