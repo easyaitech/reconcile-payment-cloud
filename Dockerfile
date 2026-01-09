@@ -20,12 +20,8 @@ RUN chmod +x /app/start.sh
 # Create data directories
 RUN mkdir -p /app/storage/uploads /app/storage/uploads/channels /app/storage/outputs
 
-# Expose port
+# Expose port (Railway will set PORT env var)
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests, os; port=os.getenv('PORT', '8000'); requests.get(f'http://localhost:{port}/api/v1/health')" || exit 1
-
-# Start command
+# Start command using start.sh
 CMD ["/app/start.sh"]
