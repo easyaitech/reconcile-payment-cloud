@@ -2,46 +2,25 @@
 FastAPI Application - Payment Reconciliation Service
 """
 import os
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router, set_payment_service
 from app.services.payment_service import PaymentService
 
+# Initialize services on module load
+api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+if not api_key:
+    print("[WARNING] OPENROUTER_API_KEY not set - LLM features will be disabled")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup/shutdown"""
-    # Startup
-    api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
-    port = os.getenv("PORT", "8000")
+payment_service = PaymentService(api_key=api_key)
+set_payment_service(payment_service)
+print("[INFO] Payment Reconciliation Service initialized")
 
-    # Use stdout for logging
-    print(f"[STARTUP] PORT={port}")
-    print(f"[STARTUP] OPENROUTER_API_KEY set: {bool(api_key)}")
-
-    if not api_key:
-        print("[WARNING] OPENROUTER_API_KEY not set - LLM features will be disabled")
-
-    print("[STARTUP] Creating PaymentService...")
-    payment_service = PaymentService(api_key=api_key)
-    print("[STARTUP] PaymentService created")
-
-    set_payment_service(payment_service)
-
-    print("[INFO] Payment Reconciliation Service started")
-    yield
-
-    # Shutdown
-    print("[INFO] Payment Reconciliation Service stopped")
-
-
-# Create FastAPI app
+# Create FastAPI app (no lifespan - services initialized at import)
 app = FastAPI(
     title="Payment Reconciliation API",
     description="LLM-driven intelligent payment reconciliation service",
-    version="1.0.0",
-    lifespan=lifespan
+    version="1.0.0"
 )
 
 # Add CORS middleware
