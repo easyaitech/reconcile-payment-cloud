@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+# Force rebuild label
+LABEL rebuild=v2
+
 # Set working directory
 WORKDIR /app
 
