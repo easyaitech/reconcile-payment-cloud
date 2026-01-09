@@ -1,8 +1,5 @@
 FROM python:3.11-slim
 
-# Force rebuild label
-LABEL rebuild=v2
-
 # Set working directory
 WORKDIR /app
 
@@ -17,14 +14,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Make start script executable
-RUN chmod +x /app/start.sh
-
 # Create data directories
 RUN mkdir -p /app/storage/uploads /app/storage/uploads/channels /app/storage/outputs
 
-# Expose port (Railway will set PORT env var)
+# Railway expects the app to bind to the PORT env var
+# We use a small wrapper script to handle this
+ENV PORT=8000
+
+# Expose port
 EXPOSE 8000
 
-# Start command using start.sh
-CMD ["/app/start.sh"]
+# Create a simple entrypoint that handles PORT
+RUN echo '#!/bin/sh\nexec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}' > /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]
