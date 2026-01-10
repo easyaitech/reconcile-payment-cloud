@@ -556,6 +556,28 @@
             return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
 
+        // 文件上传处理函数
+        function setupFileUpload(inputId, areaId, type) {
+            const input = document.getElementById(inputId);
+            const area = document.getElementById(areaId);
+            const info = area.querySelector('.file-info');
+
+            input.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    area.classList.add('has-file');
+                    info.innerHTML = `<span class="name">✓ ${file.name}</span> (${formatSize(file.size)})`;
+
+                    if (type === 'deposit') {
+                        state.depositFile = file;
+                    } else if (type === 'withdraw') {
+                        state.withdrawFile = file;
+                    }
+                    updateSubmitButton();
+                }
+            });
+        }
+
         function updateSubmitButton() {
             const btn = document.getElementById('submitBtn');
             const hasDeposit = state.depositFile !== null || state.withdrawFile !== null;
