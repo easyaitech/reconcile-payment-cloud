@@ -327,19 +327,28 @@ class Reconciler:
         }
 
     def reconcile(self, supplier_name: str = "RED") -> Dict[str, Any]:
-        """Perform reconciliation"""
+        """
+        Perform reconciliation - focused on anomalies
+
+        Logic:
+        - Game orders are the source of truth
+        - Channel orders not in game = normal (ignore)
+        - Game orders not in channel = ANOMALY (list each)
+        - Amount mismatch = ANOMALY (list each)
+        """
         if self.game_deposit_df is None and self.game_withdraw_df is None:
             return {"error": "Please load game backend files first"}
 
         results = {
             "summary": {
-                "total_deposit": {"count": 0, "matched": 0, "amount": 0, "matched_amount": 0},
-                "total_withdraw": {"count": 0, "matched": 0, "amount": 0, "matched_amount": 0}
+                "deposit": {"total": 0, "matched": 0, "missing": 0, "mismatched": 0, "amount": 0},
+                "withdraw": {"total": 0, "matched": 0, "missing": 0, "mismatched": 0, "amount": 0}
             },
-            "channels": {},
-            "mismatched": [],
-            "missing_in_channel": [],
-            "missing_in_game": []
+            "anomalies": {
+                "missing_in_channel": [],  # Game orders not found in channel
+                "amount_mismatch": []      # Orders with amount differences
+            },
+            "channels": {}  # Per-channel details
         }
 
         supplier = self._get_supplier_config(supplier_name) or {}
@@ -377,19 +386,20 @@ class Reconciler:
             )
             results["channels"][channel] = channel_result
 
-            for key in ["count", "matched", "amount", "matched_amount"]:
-                results["summary"]["total_deposit"][key] += channel_result.get("deposit", {}).get(key, 0)
-                results["summary"]["total_withdraw"][key] += channel_result.get("withdraw", {}).get(key, 0)
+            # Aggregate summary
+            for txn_type in ["deposit", "withdraw"]:
+                results["summary"][txn_type]["total"] += channel_result.get(txn_type, {}).get("total", 0)
+                results["summary"][txn_type]["matched"] += channel_result.get(txn_type, {}).get("matched", 0)
+                results["summary"][txn_type]["missing"] += channel_result.get(txn_type, {}).get("missing", 0)
+                results["summary"][txn_type]["mismatched"] += channel_result.get(txn_type, {}).get("mismatched", 0)
+                results["summary"][txn_type]["amount"] += channel_result.get(txn_type, {}).get("amount", 0)
 
-            results["mismatched"].extend([
-                {**p, "channel": channel, "type": "deposit"} for p in channel_result.get("deposit_problems", [])
-            ])
-            results["missing_in_channel"].extend([
-                {**p, "channel": channel, "type": "deposit"} for p in channel_result.get("deposit_missing", [])
-            ])
-            results["missing_in_game"].extend([
-                {**p, "channel": channel, "type": "withdraw"} for p in channel_result.get("withdraw_missing", [])
-            ])
+            # Add anomalies with channel info
+            for item in channel_result.get("missing_in_channel", []):
+                results["anomalies"]["missing_in_channel"].append({**item, "channel": channel})
+
+            for item in channel_result.get("amount_mismatch", []):
+                results["anomalies"]["amount_mismatch"].append({**item, "channel": channel})
 
         self.results = results
         return results
@@ -402,14 +412,18 @@ class Reconciler:
         order_id_col: str,
         amount_col: str
     ) -> Dict[str, Any]:
-        """Reconcile a single channel"""
+        """
+        Reconcile a single channel
+
+        Returns anomalies:
+        - missing_in_channel: Game orders not found in channel
+        - amount_mismatch: Orders with different amounts
+        """
         result = {
-            "deposit": {"count": 0, "matched": 0, "amount": 0, "matched_amount": 0},
-            "withdraw": {"count": 0, "matched": 0, "amount": 0, "matched_amount": 0},
-            "deposit_problems": [],
-            "withdraw_problems": [],
-            "deposit_missing": [],
-            "withdraw_missing": []
+            "deposit": {"total": 0, "matched": 0, "missing": 0, "mismatched": 0, "amount": 0},
+            "withdraw": {"total": 0, "matched": 0, "missing": 0, "mismatched": 0, "amount": 0},
+            "missing_in_channel": [],   # Game orders not found in channel
+            "amount_mismatch": []        # Orders with amount differences
         }
 
         # Get channel config mapping - support both old and new format
@@ -421,7 +435,7 @@ class Reconciler:
         channel_order_col = channel_field_map.get("平台订单号", channel_field_map.get("商户订单号", "商户订单号"))
         channel_amount_col = channel_field_map.get("金额", "金额")
 
-        # Build channel orders dict
+        # Build channel orders dict for quick lookup
         channel_orders = {}
         for _, row in channel_df.iterrows():
             order_id = normalize_str(row.get(channel_order_col, ""))
@@ -433,34 +447,38 @@ class Reconciler:
         if self.game_deposit_df is not None:
             deposit_df = self._filter_by_channel(self.game_deposit_df, channel_name)
             for _, row in deposit_df.iterrows():
-                result["deposit"]["count"] += 1
+                result["deposit"]["total"] += 1
                 order_id = normalize_str(row.get(order_id_col, ""))
                 amount = clean_amount(row.get(amount_col, 0))
                 result["deposit"]["amount"] += amount
 
                 if order_id in channel_orders:
-                    channel_amount = channel_orders.pop(order_id)  # Remove to track missing in game
+                    channel_amount = channel_orders.pop(order_id)
                     tolerance = max(0.01, amount * 0.01)
                     if abs(amount - channel_amount) <= tolerance:
                         result["deposit"]["matched"] += 1
-                        result["deposit"]["matched_amount"] += amount
                     else:
-                        result["deposit_problems"].append({
+                        result["deposit"]["mismatched"] += 1
+                        result["amount_mismatch"].append({
                             "order_id": order_id,
-                            "game_amount": amount,
-                            "channel_amount": channel_amount
+                            "type": "deposit",
+                            "game_amount": round(amount, 2),
+                            "channel_amount": round(channel_amount, 2),
+                            "diff": round(amount - channel_amount, 2)
                         })
                 else:
-                    result["deposit_missing"].append({
+                    result["deposit"]["missing"] += 1
+                    result["missing_in_channel"].append({
                         "order_id": order_id,
-                        "game_amount": amount
+                        "type": "deposit",
+                        "game_amount": round(amount, 2)
                     })
 
         # Reconcile withdraws
         if self.game_withdraw_df is not None:
             withdraw_df = self._filter_by_channel(self.game_withdraw_df, channel_name)
             for _, row in withdraw_df.iterrows():
-                result["withdraw"]["count"] += 1
+                result["withdraw"]["total"] += 1
                 order_id = normalize_str(row.get(order_id_col, ""))
                 amount = clean_amount(row.get(amount_col, 0))
                 result["withdraw"]["amount"] += amount
@@ -470,26 +488,25 @@ class Reconciler:
                     tolerance = max(0.01, amount * 0.01)
                     if abs(amount - channel_amount) <= tolerance:
                         result["withdraw"]["matched"] += 1
-                        result["withdraw"]["matched_amount"] += amount
                     else:
-                        result["withdraw_problems"].append({
+                        result["withdraw"]["mismatched"] += 1
+                        result["amount_mismatch"].append({
                             "order_id": order_id,
-                            "game_amount": amount,
-                            "channel_amount": channel_amount
+                            "type": "withdraw",
+                            "game_amount": round(amount, 2),
+                            "channel_amount": round(channel_amount, 2),
+                            "diff": round(amount - channel_amount, 2)
                         })
                 else:
-                    result["withdraw_missing"].append({
+                    result["withdraw"]["missing"] += 1
+                    result["missing_in_channel"].append({
                         "order_id": order_id,
-                        "game_amount": amount
+                        "type": "withdraw",
+                        "game_amount": round(amount, 2)
                     })
 
-        # Remaining in channel_orders are missing in game
-        for order_id, amount in channel_orders.items():
-            result["withdraw_missing"].append({
-                "order_id": order_id,
-                "channel_amount": amount,
-                "note": "only in channel file"
-            })
+        # Note: We ignore remaining channel_orders that don't exist in game
+        # This is normal behavior (channel can have extra orders)
 
         return result
 

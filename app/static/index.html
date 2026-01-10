@@ -643,29 +643,41 @@
             const resultsDiv = document.getElementById('results');
             const statusBadge = document.getElementById('statusBadge');
 
-            if (!result.success) {
-                showError('对账失败: ' + JSON.stringify(result));
+            // 检查是否有错误
+            if (result.data?.error) {
+                showError('对账失败: ' + result.data.error);
                 return;
             }
 
+            // success 可能为 false，但只要有数据就显示
             resultsDiv.classList.add('show');
 
-            // 状态徽章
-            statusBadge.textContent = '对账完成';
-            statusBadge.className = 'status-badge success';
+            // 状态徽章 - 根据异常数量显示不同状态
+            const anomalies = result.data?.anomalies || {};
+            const hasAnomalies = (anomalies.missing_in_channel?.length || 0) > 0 ||
+                                 (anomalies.amount_mismatch?.length || 0) > 0;
 
-            // 汇总数据
+            statusBadge.textContent = hasAnomalies ? '发现异常' : '对账完成';
+            statusBadge.className = hasAnomalies ? 'status-badge error' : 'status-badge success';
+
+            // 汇总数据 - 新结构
             const summary = result.data?.summary || {};
-            const deposit = summary.total_deposit || {};
+            const deposit = summary.deposit || { total: 0, matched: 0, missing: 0, mismatched: 0, amount: 0 };
+            const withdraw = summary.withdraw || { total: 0, matched: 0, missing: 0, mismatched: 0, amount: 0 };
 
-            document.getElementById('totalCount').textContent = deposit.count || 0;
-            document.getElementById('matchedCount').textContent = deposit.matched || 0;
+            // 计算总的充值+提款
+            const totalOrders = deposit.total + withdraw.total;
+            const totalMatched = deposit.matched + withdraw.matched;
+            const totalAmount = deposit.amount + withdraw.amount;
 
-            const rate = deposit.count > 0 ? ((deposit.matched / deposit.count) * 100).toFixed(1) : 0;
+            document.getElementById('totalCount').textContent = totalOrders;
+            document.getElementById('matchedCount').textContent = totalMatched;
+
+            const rate = totalOrders > 0 ? ((totalMatched / totalOrders) * 100).toFixed(1) : 0;
             document.getElementById('matchRate').textContent = rate + '%';
-            document.getElementById('totalAmount').textContent = '¥' + (deposit.amount || 0).toFixed(2);
+            document.getElementById('totalAmount').textContent = '¥' + totalAmount.toFixed(2);
 
-            // 渠道明细
+            // 渠道明细 - 新结构
             const channelsGrid = document.getElementById('channelsGrid');
             channelsGrid.innerHTML = '';
 
@@ -673,47 +685,67 @@
             for (const [name, data] of Object.entries(channels)) {
                 const card = document.createElement('div');
                 card.className = 'channel-card';
+                const dep = data.deposit || { total: 0, matched: 0, missing: 0, mismatched: 0 };
+                const withdr = data.withdraw || { total: 0, matched: 0, missing: 0, mismatched: 0 };
                 card.innerHTML = `
                     <div class="channel-name">${name}</div>
                     <div class="channel-stat">
-                        <span>充值订单</span>
-                        <span class="value">${data.deposit?.count || 0}</span>
+                        <span>充值</span>
+                        <span class="value">${dep.total}笔 (匹配${dep.matched})</span>
                     </div>
-                    <div class="channel-stat">
-                        <span>匹配成功</span>
-                        <span class="value">${data.deposit?.matched || 0}</span>
-                    </div>
-                    <div class="channel-stat">
-                        <span>金额</span>
-                        <span class="value">¥${(data.deposit?.amount || 0).toFixed(2)}</span>
-                    </div>
+                    ${dep.missing > 0 ? `<div class="channel-stat" style="color: #f44336;"><span>缺失</span><span class="value">${dep.missing}笔</span></div>` : ''}
+                    ${dep.mismatched > 0 ? `<div class="channel-stat" style="color: #ff9800;"><span>金额不符</span><span class="value">${dep.mismatched}笔</span></div>` : ''}
                 `;
                 channelsGrid.appendChild(card);
             }
 
-            // 异常
+            // 异常展示 - 新结构
             const anomaliesDiv = document.getElementById('anomalies');
-            const missingInGame = result.data?.missing_in_game || [];
-            const missingInChannel = result.data?.missing_in_channel || [];
+            const missingInChannel = anomalies.missing_in_channel || [];
+            const amountMismatch = anomalies.amount_mismatch || [];
 
-            if (missingInGame.length === 0 && missingInChannel.length === 0) {
-                anomaliesDiv.innerHTML = '<div style="color: #4caf50; padding: 10px;">✓ 无异常订单</div>';
+            if (missingInChannel.length === 0 && amountMismatch.length === 0) {
+                anomaliesDiv.innerHTML = '<div style="color: #4caf50; padding: 15px; background: #f0f9f0; border-radius: 8px;">✓ 无异常订单</div>';
             } else {
                 let html = '';
-                if (missingInGame.length > 0) {
-                    html += '<div style="margin-bottom: 10px;"><strong style="color: #ff9800;">只在渠道文件中存在 (' + missingInGame.length + '笔):</strong><ul style="margin-left: 20px; margin-top: 5px;">';
-                    missingInGame.forEach(item => {
-                        html += `<li>${item.order_id} - ¥${item.channel_amount || 0}</li>`;
-                    });
-                    html += '</ul></div>';
-                }
+
+                // 缺失订单：游戏有，渠道没有
                 if (missingInChannel.length > 0) {
-                    html += '<div><strong style="color: #f44336;">只在游戏后台中存在 (' + missingInChannel.length + '笔):</strong><ul style="margin-left: 20px; margin-top: 5px;">';
+                    html += '<div style="margin-bottom: 15px; padding: 12px; background: #ffebee; border-radius: 8px;">';
+                    html += '<strong style="color: #f44336;">⚠ 游戏订单在渠道中缺失 (' + missingInChannel.length + '笔)</strong>';
+                    html += '<div style="max-height: 200px; overflow-y: auto; margin-top: 8px;">';
+                    html += '<table style="width: 100%; font-size: 12px; border-collapse: collapse;">';
+                    html += '<tr style="background: #ffcdd2;"><th style="padding: 6px; text-align: left;">订单号</th><th style="padding: 6px;">类型</th><th style="padding: 6px;">金额</th><th style="padding: 6px;">渠道</th></tr>';
                     missingInChannel.forEach(item => {
-                        html += `<li>${item.order_id} - ¥${item.game_amount || 0}</li>`;
+                        html += `<tr>
+                            <td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">${item.order_id}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">${item.type === 'deposit' ? '充值' : '提款'}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">¥${item.game_amount}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">${item.channel || '-'}</td>
+                        </tr>`;
                     });
-                    html += '</ul></div>';
+                    html += '</table></div></div>';
                 }
+
+                // 金额不符
+                if (amountMismatch.length > 0) {
+                    html += '<div style="padding: 12px; background: #fff3e0; border-radius: 8px;">';
+                    html += '<strong style="color: #ff9800;">⚠ 金额不一致 (' + amountMismatch.length + '笔)</strong>';
+                    html += '<div style="max-height: 200px; overflow-y: auto; margin-top: 8px;">';
+                    html += '<table style="width: 100%; font-size: 12px; border-collapse: collapse;">';
+                    html += '<tr style="background: #ffe0b2;"><th style="padding: 6px; text-align: left;">订单号</th><th style="padding: 6px;">类型</th><th style="padding: 6px;">游戏金额</th><th style="padding: 6px;">渠道金额</th><th style="padding: 6px;">差异</th></tr>';
+                    amountMismatch.forEach(item => {
+                        html += `<tr>
+                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">${item.order_id}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">${item.type === 'deposit' ? '充值' : '提款'}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">¥${item.game_amount}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">¥${item.channel_amount}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2; color: #f44336;">¥${item.diff}</td>
+                        </tr>`;
+                    });
+                    html += '</table></div></div>';
+                }
+
                 anomaliesDiv.innerHTML = html;
             }
 
