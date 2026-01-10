@@ -91,10 +91,20 @@ async def reconcile(
 @router.get("/health")
 async def health():
     """Health check endpoint"""
+    from app.utils.storage import sanitize_filename
+
+    test_filename = "test file (1).xlsx"
+    sanitized = sanitize_filename(test_filename)
+
     return {
         "status": "ok",
         "service": "reconcile-payment-api",
-        "version": "1.0.0"
+        "version": "1.0.3",
+        "sanitization_test": {
+            "input": test_filename,
+            "output": sanitized,
+            "working": sanitized == "test_file_1.xlsx"
+        }
     }
 
 
