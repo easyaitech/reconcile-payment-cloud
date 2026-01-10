@@ -165,7 +165,11 @@ def read_file_safe(file_path: str) -> Optional[pd.DataFrame]:
 
     if not Path(file_path).exists():
         print(f"[ERROR] File not found: {file_path}")
+        print(f"[DEBUG] Absolute path would be: {Path(file_path).absolute()}")
+        print(f"[DEBUG] Directory exists: {Path(file_path).parent.exists()}")
         return None
+
+    print(f"[INFO] Attempting to read file: {file_path}")
 
     # First try: Excel format
     # Try header_row=1 first (common format with title row)
@@ -173,9 +177,12 @@ def read_file_safe(file_path: str) -> Optional[pd.DataFrame]:
     # Then None (no header, generate column names)
     for header_row in [1, 0, None]:
         try:
+            print(f"[DEBUG] Trying Excel with header_row={header_row}")
             df = pd.read_excel(file_path, engine="openpyxl", header=header_row)
+            print(f"[DEBUG] Read {len(df)} rows, {len(df.columns)} columns")
             if len(df.columns) > 1:
                 first_col = str(df.columns[0])
+                print(f"[DEBUG] First column: '{first_col}'")
                 # Valid headers should look like field names, not data
                 # Reject if first column looks like data (starts with letter+digits like D001)
                 # or is a generic title like "充值订单", "提现订单"
@@ -184,8 +191,10 @@ def read_file_safe(file_path: str) -> Optional[pd.DataFrame]:
                     not first_col.isdigit() and
                     not re.match(r'^[A-Za-z]+\d+$', first_col) and
                     first_col not in ["充值订单", "提现订单", "订单", "ID"]):
+                    print(f"[INFO] Successfully read Excel file with header_row={header_row}")
                     return df
-        except Exception:
+        except Exception as e:
+            print(f"[DEBUG] Excel read failed with header_row={header_row}: {e}")
             continue
 
     # If Excel failed, try CSV

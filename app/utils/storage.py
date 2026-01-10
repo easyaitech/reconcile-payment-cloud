@@ -2,6 +2,7 @@
 File storage utilities for handling uploads
 """
 import os
+import re
 import shutil
 import aiofiles
 from pathlib import Path
@@ -11,6 +12,34 @@ from fastapi import UploadFile
 
 # Base storage directory
 STORAGE_BASE = Path(__file__).parent.parent.parent / "storage"
+
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitize filename by replacing problematic characters with safe alternatives
+
+    - Spaces -> underscores
+    - Parentheses -> underscores
+    - Other special chars -> underscores (except letters, digits, dot, hyphen, underscore)
+    """
+    if not filename:
+        return "unnamed_file"
+
+    # Get name and extension
+    name, ext = os.path.splitext(filename)
+
+    # Replace problematic characters with underscores
+    # Keep only: letters, digits, dot, hyphen, underscore
+    safe_name = re.sub(r'[^\w\-.]', '_', name, flags=re.ASCII)
+
+    # Remove multiple consecutive underscores
+    safe_name = re.sub(r'_+', '_', safe_name).strip('_')
+
+    # If empty after sanitization, use default
+    if not safe_name:
+        safe_name = "unnamed_file"
+
+    return safe_name + ext
 
 
 async def save_upload_file(
@@ -31,10 +60,8 @@ async def save_upload_file(
     target_dir = STORAGE_BASE / subdirectory.lstrip("/")
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Generate safe filename
-    filename = upload_file.filename or "uploaded_file"
-    # Sanitize filename
-    filename = filename.replace("..", "").replace("/", "_").replace("\\", "_")
+    # Generate safe filename using the new sanitization function
+    filename = sanitize_filename(upload_file.filename or "uploaded_file")
 
     file_path = target_dir / filename
 
