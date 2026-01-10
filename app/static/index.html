@@ -122,6 +122,25 @@
             font-weight: 500;
         }
 
+        .channel-selector {
+            margin-top: 10px;
+        }
+
+        .channel-selector select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .channel-selector select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
         .options {
             display: flex;
             gap: 20px;
@@ -365,29 +384,12 @@
             <!-- 支付渠道文件 -->
             <div class="section">
                 <div class="section-title"><span class="number">2</span> 支付渠道文件</div>
-                <div class="channel-files">
-                    <div class="upload-area channel-file-item" id="channel1Area">
-                        <label class="upload-btn">
-                            选择渠道文件 1
-                            <input type="file" class="file-input channel-input" accept=".csv,.xlsx,.xls">
-                        </label>
-                        <div class="file-info"></div>
-                    </div>
-                    <div class="upload-area channel-file-item" id="channel2Area">
-                        <label class="upload-btn">
-                            选择渠道文件 2
-                            <input type="file" class="file-input channel-input" accept=".csv,.xlsx,.xls">
-                        </label>
-                        <div class="file-info"></div>
-                    </div>
-                    <div class="upload-area channel-file-item" id="channel3Area">
-                        <label class="upload-btn">
-                            选择渠道文件 3
-                            <input type="file" class="file-input channel-input" accept=".csv,.xlsx,.xls">
-                        </label>
-                        <div class="file-info"></div>
-                    </div>
+                <div id="channelFilesContainer">
+                    <!-- 动态生成渠道文件上传区 -->
                 </div>
+                <button type="button" class="upload-btn" onclick="addChannelFile()" style="margin-top: 10px;">
+                    + 添加更多渠道文件
+                </button>
             </div>
 
             <!-- 选项 -->
@@ -468,33 +470,84 @@
         const state = {
             depositFile: null,
             withdrawFile: null,
-            channelFiles: []
+            channelFiles: [],
+            channelCount: 0
         };
 
-        // 文件选择处理
-        function setupFileUpload(inputId, areaId, type, index = null) {
-            const input = document.getElementById(inputId);
-            const area = document.getElementById(areaId);
-            const info = area.querySelector('.file-info');
+        // 预定义渠道列表
+        const PREDEFINED_CHANNELS = [
+            { value: 'BOSSPAY', label: 'BOSSPAY' },
+            { value: 'antpay', label: 'antpay' },
+            { value: 'apppay', label: 'apppay' },
+            { value: 'custom', label: '自定义...' }
+        ];
+
+        // 添加渠道文件上传区
+        function addChannelFile() {
+            state.channelCount++;
+            const index = state.channelCount;
+            const container = document.getElementById('channelFilesContainer');
+
+            const div = document.createElement('div');
+            div.className = 'upload-area channel-file-item';
+            div.id = `channel${index}Area`;
+            div.innerHTML = `
+                <label class="upload-btn">
+                    选择渠道文件 ${index}
+                    <input type="file" class="file-input channel-input" accept=".csv,.xlsx,.xls" data-index="${index}">
+                </label>
+                <div class="channel-selector">
+                    <select class="channel-select" data-index="${index}">
+                        <option value="">请选择渠道...</option>
+                        ${PREDEFINED_CHANNELS.map(c => `<option value="${c.value}">${c.label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="file-info"></div>
+            `;
+            container.appendChild(div);
+
+            // 绑定事件
+            const input = div.querySelector('.file-input');
+            const select = div.querySelector('.channel-select');
+            const info = div.querySelector('.file-info');
 
             input.addEventListener('change', function() {
                 const file = this.files[0];
                 if (file) {
-                    area.classList.add('has-file');
+                    div.classList.add('has-file');
                     info.innerHTML = `<span class="name">✓ ${file.name}</span> (${formatSize(file.size)})`;
 
-                    if (type === 'deposit') {
-                        state.depositFile = file;
-                    } else if (type === 'withdraw') {
-                        state.withdrawFile = file;
-                    } else if (type === 'channel') {
-                        if (index !== null) {
-                            state.channelFiles[index] = file;
-                        }
+                    // 根据文件名自动选择渠道
+                    const filename = file.name.replace(/\.[^/.]+$/, '').toUpperCase();
+                    const matchingChannel = PREDEFINED_CHANNELS.find(c => filename.includes(c.value.toUpperCase()));
+                    if (matchingChannel) {
+                        select.value = matchingChannel.value;
                     }
-                    updateSubmitButton();
+
+                    updateChannelFile(index, file, select.value);
                 }
             });
+
+            select.addEventListener('change', function() {
+                const file = input.files[0];
+                if (file) {
+                    updateChannelFile(index, file, this.value);
+                }
+            });
+        }
+
+        function updateChannelFile(index, file, channelName) {
+            // 确保 channelFiles 数组有足够长度
+            while (state.channelFiles.length <= index) {
+                state.channelFiles.push(null);
+            }
+            state.channelFiles[index] = { file, channelName };
+            updateSubmitButton();
+        }
+
+        // 初始化3个渠道文件上传区
+        for (let i = 1; i <= 3; i++) {
+            addChannelFile();
         }
 
         function formatSize(bytes) {
@@ -506,18 +559,13 @@
         function updateSubmitButton() {
             const btn = document.getElementById('submitBtn');
             const hasDeposit = state.depositFile !== null || state.withdrawFile !== null;
-            const hasChannels = state.channelFiles.some(f => f !== null);
+            const hasChannels = state.channelFiles.some(f => f !== null && f.file !== null);
             btn.disabled = !(hasDeposit && hasChannels);
         }
 
         // 初始化文件上传
         setupFileUpload('depositFile', 'depositArea', 'deposit');
         setupFileUpload('withdrawFile', 'withdrawArea', 'withdraw');
-
-        document.querySelectorAll('.channel-input').forEach((input, index) => {
-            const areaId = input.closest('.upload-area').id;
-            setupFileUpload(input.id, areaId, 'channel', index);
-        });
 
         // 提交对账
         document.getElementById('submitBtn').addEventListener('click', async function() {
@@ -530,8 +578,15 @@
             if (state.withdrawFile) {
                 formData.append('withdraw', state.withdrawFile);
             }
-            state.channelFiles.forEach(file => {
-                if (file) formData.append('channels', file);
+
+            // 添加渠道文件，使用渠道名作为文件名
+            state.channelFiles.forEach(item => {
+                if (item && item.file) {
+                    // 重命名文件以匹配渠道名
+                    const newFileName = `${item.channelName}.${item.file.name.split('.').pop()}`;
+                    const newFile = new File([item.file], newFileName, { type: item.file.type });
+                    formData.append('channels', newFile);
+                }
             });
 
             // 添加选项
