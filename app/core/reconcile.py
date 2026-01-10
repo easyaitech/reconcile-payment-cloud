@@ -184,15 +184,27 @@ def read_file_safe(file_path: str) -> Optional[pd.DataFrame]:
                 first_col = str(df.columns[0])
                 print(f"[DEBUG] First column: '{first_col}'")
                 # Valid headers should look like field names, not data
-                # Reject if first column looks like data (starts with letter+digits like D001)
-                # or is a generic title like "充值订单", "提现订单"
+                # Reject if first column is a generic title row like "充值订单", "提现订单"
                 import re
-                if (not first_col.startswith("Unnamed") and
-                    not first_col.isdigit() and
-                    not re.match(r'^[A-Za-z]+\d+$', first_col) and
-                    first_col not in ["充值订单", "提现订单", "订单", "ID"]):
-                    print(f"[INFO] Successfully read Excel file with header_row={header_row}")
-                    return df
+                # Reject: generic titles that indicate we haven't reached the actual header row yet
+                if first_col in ["充值订单", "提现订单", "订单"]:
+                    print(f"[DEBUG] Skipping: first column is a generic title")
+                    continue
+                # Reject: unnamed columns
+                if first_col.startswith("Unnamed"):
+                    print(f"[DEBUG] Skipping: first column is Unnamed")
+                    continue
+                # Reject: pure digit (likely data row, not header)
+                if first_col.isdigit():
+                    print(f"[DEBUG] Skipping: first column is a digit")
+                    continue
+                # Reject: pattern like D001 (data row, not header)
+                if re.match(r'^[A-Za-z]+\d+$', first_col):
+                    print(f"[DEBUG] Skipping: first column looks like data (letter+digits)")
+                    continue
+                # If we get here, this looks like a valid header row
+                print(f"[INFO] Successfully read Excel file with header_row={header_row}")
+                return df
         except Exception as e:
             print(f"[DEBUG] Excel read failed with header_row={header_row}: {e}")
             continue
