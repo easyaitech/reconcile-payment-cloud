@@ -168,21 +168,22 @@ def read_file_safe(file_path: str) -> Optional[pd.DataFrame]:
         return None
 
     # First try: Excel format
-    # Try header_row=0 first (most common), then fallback to 1, then None
-    for header_row in [0, 1, None]:
+    # Try header_row=1 first (common format with title row)
+    # Then header_row=0 (direct header)
+    # Then None (no header, generate column names)
+    for header_row in [1, 0, None]:
         try:
             df = pd.read_excel(file_path, engine="openpyxl", header=header_row)
             if len(df.columns) > 1:
                 first_col = str(df.columns[0])
-                # Valid headers should not look like data (e.g., "D001", "001")
-                # Reject if first column is:
-                # - A number (all digits)
-                # - Starts with letter followed by digits (likely an ID like "D001", "R123")
-                # - Starts with "Unnamed"
+                # Valid headers should look like field names, not data
+                # Reject if first column looks like data (starts with letter+digits like D001)
+                # or is a generic title like "充值订单", "提现订单"
                 import re
                 if (not first_col.startswith("Unnamed") and
                     not first_col.isdigit() and
-                    not re.match(r'^[A-Za-z]+\d+$', first_col)):
+                    not re.match(r'^[A-Za-z]+\d+$', first_col) and
+                    first_col not in ["充值订单", "提现订单", "订单", "ID"]):
                     return df
         except Exception:
             continue
