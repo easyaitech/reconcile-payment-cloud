@@ -171,14 +171,19 @@ def read_file_safe(file_path: str) -> Optional[pd.DataFrame]:
 
     print(f"[INFO] Attempting to read file: {file_path}")
 
-    # First try: Excel format
+    # Determine which Excel engine to use based on file extension
+    file_ext = Path(file_path).suffix.lower()
+    excel_engine = "openpyxl" if file_ext == ".xlsx" else "xlrd"
+    print(f"[DEBUG] File extension: {file_ext}, using engine: {excel_engine}")
+
+    # First try: Excel format with various header rows
     # Try header_row=1 first (common format with title row)
     # Then header_row=0 (direct header)
     # Then None (no header, generate column names)
     for header_row in [1, 0, None]:
         try:
-            print(f"[DEBUG] Trying Excel with header_row={header_row}")
-            df = pd.read_excel(file_path, engine="openpyxl", header=header_row)
+            print(f"[DEBUG] Trying Excel with engine={excel_engine}, header_row={header_row}")
+            df = pd.read_excel(file_path, engine=excel_engine, header=header_row)
             print(f"[DEBUG] Read {len(df)} rows, {len(df.columns)} columns")
             if len(df.columns) > 1:
                 first_col = str(df.columns[0])
@@ -207,6 +212,18 @@ def read_file_safe(file_path: str) -> Optional[pd.DataFrame]:
                 return df
         except Exception as e:
             print(f"[DEBUG] Excel read failed with header_row={header_row}: {e}")
+            # If xlrd is not available and it's a .xls file, try openpyxl as fallback
+            if "xlrd" in str(e) or "Install xlrd" in str(e):
+                try:
+                    print(f"[DEBUG] Retrying with openpyxl engine for .xls file")
+                    df = pd.read_excel(file_path, engine="openpyxl", header=header_row)
+                    if len(df.columns) > 1:
+                        first_col = str(df.columns[0])
+                        if first_col not in ["充值订单", "提现订单", "订单"]:
+                            print(f"[INFO] Successfully read with openpyxl")
+                            return df
+                except Exception as e2:
+                    print(f"[DEBUG] openpyxl fallback also failed: {e2}")
             continue
 
     # If Excel failed, try CSV
@@ -382,7 +399,8 @@ class Reconciler:
             for file_channel, df in self.channel_dfs.items():
                 file_channel_norm = normalize_str(file_channel)
                 print(f"[DEBUG]   Checking against file: '{file_channel}' -> normalized: '{file_channel_norm}'")
-                if file_channel_norm in channel.lower() or channel.lower() in file_channel_norm:
+                # Case-insensitive matching
+                if file_channel_norm.lower() in channel.lower() or channel.lower() in file_channel_norm.lower():
                     channel_df = df
                     actual_channel_name = file_channel
                     matched_files.add(file_channel)
