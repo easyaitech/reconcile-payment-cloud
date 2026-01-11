@@ -464,6 +464,8 @@
     </div>
 
     <script>
+        console.log('[DEBUG] Script loaded, initializing...');
+
         const API_BASE = window.location.origin;
 
         // 文件状态
@@ -481,6 +483,36 @@
             { value: 'apppay', label: 'apppay' },
             { value: 'custom', label: '自定义...' }
         ];
+
+        // 等待 DOM 加载完成
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[DEBUG] DOM loaded, initializing handlers...');
+
+            try {
+                // 初始化渠道文件上传区
+                initChannelFiles();
+
+                // 初始化文件上传
+                setupFileUpload('depositFile', 'depositArea', 'deposit');
+                setupFileUpload('withdrawFile', 'withdrawArea', 'withdraw');
+
+                // 初始化提交按钮状态
+                updateSubmitButton();
+
+                // 绑定提交按钮事件
+                const submitBtn = document.getElementById('submitBtn');
+                if (submitBtn) {
+                    submitBtn.addEventListener('click', submitReconcile);
+                    console.log('[DEBUG] Submit button handler attached');
+                } else {
+                    console.error('[ERROR] Submit button not found!');
+                }
+
+                console.log('[DEBUG] All handlers initialized successfully');
+            } catch (error) {
+                console.error('[ERROR] Initialization failed:', error);
+            }
+        });
 
         // 添加渠道文件上传区
         function addChannelFile() {
@@ -545,9 +577,14 @@
             updateSubmitButton();
         }
 
-        // 初始化3个渠道文件上传区
-        for (let i = 1; i <= 3; i++) {
-            addChannelFile();
+        // 初始化渠道文件上传区
+        function initChannelFiles() {
+            console.log('[DEBUG] Initializing channel file areas...');
+            // 初始化3个渠道文件上传区
+            for (let i = 1; i <= 3; i++) {
+                addChannelFile();
+            }
+            console.log('[DEBUG] Channel file areas initialized');
         }
 
         function formatSize(bytes) {
@@ -558,39 +595,56 @@
 
         // 文件上传处理函数
         function setupFileUpload(inputId, areaId, type) {
+            console.log(`[DEBUG] Setting up file upload: ${inputId}, ${areaId}, ${type}`);
             const input = document.getElementById(inputId);
             const area = document.getElementById(areaId);
             const info = area.querySelector('.file-info');
 
+            if (!input || !area || !info) {
+                console.error(`[ERROR] Failed to find elements for ${inputId}:`, { input, area, info });
+                return;
+            }
+
             input.addEventListener('change', function() {
+                console.log(`[DEBUG] File changed for ${inputId}`);
                 const file = this.files[0];
                 if (file) {
+                    console.log(`[DEBUG] File selected: ${file.name}, size: ${file.size}`);
                     area.classList.add('has-file');
                     info.innerHTML = `<span class="name">✓ ${file.name}</span> (${formatSize(file.size)})`;
 
                     if (type === 'deposit') {
                         state.depositFile = file;
+                        console.log('[DEBUG] Deposit file saved to state');
                     } else if (type === 'withdraw') {
                         state.withdrawFile = file;
+                        console.log('[DEBUG] Withdraw file saved to state');
                     }
                     updateSubmitButton();
                 }
             });
+            console.log(`[DEBUG] File upload handler attached to ${inputId}`);
         }
 
         function updateSubmitButton() {
             const btn = document.getElementById('submitBtn');
             const hasDeposit = state.depositFile !== null || state.withdrawFile !== null;
             const hasChannels = state.channelFiles.some(f => f !== null && f.file !== null);
-            btn.disabled = !(hasDeposit && hasChannels);
+            if (btn) {
+                btn.disabled = !(hasDeposit && hasChannels);
+                console.log(`[DEBUG] Submit button updated: disabled=${btn.disabled}, hasDeposit=${hasDeposit}, hasChannels=${hasChannels}`);
+            }
         }
 
-        // 初始化文件上传
-        setupFileUpload('depositFile', 'depositArea', 'deposit');
-        setupFileUpload('withdrawFile', 'withdrawArea', 'withdraw');
+        // 提交对账处理函数
+        async function submitReconcile() {
+            console.log('[DEBUG] Submit reconcile clicked');
+            console.log('[DEBUG] Current state:', {
+                depositFile: state.depositFile?.name,
+                withdrawFile: state.withdrawFile?.name,
+                channelFiles: state.channelFiles.map(f => f ? f.file?.name : null)
+            });
 
-        // 提交对账
-        document.getElementById('submitBtn').addEventListener('click', async function() {
             const formData = new FormData();
 
             // 添加文件
@@ -602,14 +656,17 @@
             }
 
             // 添加渠道文件，使用渠道名作为文件名
+            let channelCount = 0;
             state.channelFiles.forEach(item => {
                 if (item && item.file) {
+                    channelCount++;
                     // 重命名文件以匹配渠道名
                     const newFileName = `${item.channelName}.${item.file.name.split('.').pop()}`;
                     const newFile = new File([item.file], newFileName, { type: item.file.type });
                     formData.append('channels', newFile);
                 }
             });
+            console.log(`[DEBUG] Sending ${channelCount} channel files`);
 
             // 添加选项
             formData.append('adapt', document.getElementById('adaptCheck').checked);
@@ -619,25 +676,29 @@
             document.getElementById('loading').style.display = 'block';
             document.getElementById('results').classList.remove('show');
             document.getElementById('errorMessage').style.display = 'none';
-            this.disabled = true;
-            this.textContent = '对账中...';
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = '对账中...';
 
             try {
+                console.log('[DEBUG] Sending request to API...');
                 const response = await fetch(`${API_BASE}/api/v1/reconcile`, {
                     method: 'POST',
                     body: formData
                 });
 
                 const result = await response.json();
+                console.log('[DEBUG] Response received:', result);
                 displayResults(result);
             } catch (error) {
+                console.error('[ERROR] Request failed:', error);
                 showError('请求失败: ' + error.message);
             } finally {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('submitBtn').disabled = false;
                 document.getElementById('submitBtn').textContent = '开始对账';
             }
-        });
+        }
 
         function displayResults(result) {
             const resultsDiv = document.getElementById('results');
