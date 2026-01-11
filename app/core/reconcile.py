@@ -356,28 +356,41 @@ class Reconciler:
         channel_col = supplier.get("channel_column", "支付渠道")
         amount_col = supplier.get("amount_column", "实际金额")
 
-        # Get all channels
+        # Get all channels from game files
         all_channels = set()
         if self.game_deposit_df is not None and channel_col in self.game_deposit_df.columns:
             all_channels.update(self.game_deposit_df[channel_col].dropna().unique())
         if self.game_withdraw_df is not None and channel_col in self.game_withdraw_df.columns:
             all_channels.update(self.game_withdraw_df[channel_col].dropna().unique())
 
+        print(f"[DEBUG] Game channels found: {all_channels}")
+        print(f"[DEBUG] Uploaded channel files: {list(self.channel_dfs.keys())}")
+
+        # Track which uploaded files were matched
+        matched_files = set()
+
         for channel_name in all_channels:
             channel = normalize_str(channel_name)
             if not channel or channel == "nan":
                 continue
 
+            print(f"[DEBUG] Processing game channel: '{channel_name}' -> normalized: '{channel}'")
+
             # Find matching channel file
             channel_df = None
             actual_channel_name = None
             for file_channel, df in self.channel_dfs.items():
-                if file_channel.lower() in channel.lower() or channel.lower() in file_channel.lower():
+                file_channel_norm = normalize_str(file_channel)
+                print(f"[DEBUG]   Checking against file: '{file_channel}' -> normalized: '{file_channel_norm}'")
+                if file_channel_norm in channel.lower() or channel.lower() in file_channel_norm:
                     channel_df = df
                     actual_channel_name = file_channel
+                    matched_files.add(file_channel)
+                    print(f"[DEBUG]   ✓ Matched with file: '{file_channel}'")
                     break
 
             if channel_df is None:
+                print(f"[DEBUG]   ✗ No matching file found for channel: '{channel}'")
                 continue
 
             channel_config = self._get_channel_config(channel)
@@ -400,6 +413,11 @@ class Reconciler:
 
             for item in channel_result.get("amount_mismatch", []):
                 results["anomalies"]["amount_mismatch"].append({**item, "channel": channel})
+
+        # Log unmatched uploaded files
+        unmatched_files = set(self.channel_dfs.keys()) - matched_files
+        if unmatched_files:
+            print(f"[DEBUG] Uploaded files not matched to any game channel: {unmatched_files}")
 
         self.results = results
         return results
