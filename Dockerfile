@@ -11,7 +11,8 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files (v2 - force cache invalidate)
+# Copy project files - cache bust 2025-01-12-v3
+ARG CACHEBUST=1
 COPY . .
 
 # Create data directories
