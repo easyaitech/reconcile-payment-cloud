@@ -48,10 +48,17 @@ app.include_router(router)
 
 @app.get("/")
 async def root():
-    """Serve frontend page"""
+    """Serve frontend page with cache-busting headers"""
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
-        return FileResponse(str(index_file))
+        return FileResponse(
+            str(index_file),
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     return {
         "service": "Payment Reconciliation API",
         "version": "1.0.0",
