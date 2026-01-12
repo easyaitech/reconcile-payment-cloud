@@ -1,0 +1,25 @@
+{
+  "name": "reconcile-payment-cloud",
+  "version": "1.0.0",
+  "description": "LLM-driven intelligent payment reconciliation service for gaming platforms.",
+  "main": "index.js",
+  "scripts": {
+    "test:e2e": "node tests/e2e.test.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/easyaitech/reconcile-payment-cloud.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/easyaitech/reconcile-payment-cloud/issues"
+  },
+  "homepage": "https://github.com/easyaitech/reconcile-payment-cloud#readme",
+  "dependencies": {
+    "@playwright/test": "^1.57.0"
+  }
+}

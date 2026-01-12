@@ -352,6 +352,225 @@
             flex: 1;
             min-width: 120px;
         }
+
+        /* 配置管理样式 */
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding: 0 30px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .nav-tab {
+            padding: 12px 24px;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .nav-tab:hover {
+            color: white;
+        }
+
+        .nav-tab.active {
+            color: white;
+            border-bottom-color: white;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .config-section {
+            margin-bottom: 25px;
+        }
+
+        .config-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .config-header h3 {
+            font-size: 16px;
+            color: #333;
+        }
+
+        .add-btn {
+            background: #4caf50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .add-btn:hover {
+            background: #45a049;
+        }
+
+        .channel-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .channel-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .channel-info {
+            flex: 1;
+        }
+
+        .channel-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .channel-details {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .delete-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .delete-btn:hover {
+            background: #d32f2f;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            width: 90%;
+            max-width: 450px;
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-help {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .config-editor {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .config-editor textarea {
+            width: 100%;
+            height: 300px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            resize: vertical;
+        }
     </style>
 </head>
 <body>
@@ -359,9 +578,14 @@
         <div class="header">
             <h1>支付对账系统</h1>
             <p>LLM 驱动的智能支付对账服务</p>
+            <div class="nav-tabs">
+                <div class="nav-tab active" onclick="switchPage('reconcile')">对账</div>
+                <div class="nav-tab" onclick="switchPage('config')">配置管理</div>
+            </div>
         </div>
 
-        <div class="content">
+        <!-- 对账页面 -->
+        <div class="content page active" id="reconcilePage">
             <!-- 游戏后台文件 -->
             <div class="section">
                 <div class="section-title"><span class="number">1</span> 游戏后台文件</div>
@@ -461,7 +685,93 @@
                 </div>
             </div>
         </div>
+
+        <!-- 配置管理页面 -->
+        <div class="content page" id="configPage">
+            <!-- 支付渠道配置 -->
+            <div class="config-section">
+                <div class="config-header">
+                    <h3>支付渠道配置</h3>
+                    <button class="add-btn" onclick="openChannelModal()">+ 添加渠道</button>
+                </div>
+                <div class="channel-list" id="channelList">
+                    <div class="channel-item">
+                        <div class="channel-info">
+                            <div class="channel-details">正在加载...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 游戏供应商配置 -->
+            <div class="config-section">
+                <div class="config-header">
+                    <h3>游戏供应商配置</h3>
+                </div>
+                <div class="channel-item">
+                    <div class="channel-info">
+                        <div class="channel-name">RED (默认)</div>
+                        <div class="channel-details">订单编号 | 支付渠道 | 状态 | 实际金额</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 完整配置编辑 -->
+            <div class="config-section">
+                <div class="config-header">
+                    <h3>完整配置 (JSON)</h3>
+                    <button class="add-btn" onclick="saveFullConfig()">保存配置</button>
+                </div>
+                <div class="config-editor">
+                    <textarea id="fullConfigEditor" placeholder="加载中..."></textarea>
+                </div>
+                <div class="form-help" style="margin-top: 10px;">
+                    提示：可以直接编辑上面的 JSON 配置，然后点击"保存配置"按钮。修改后立即生效。
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- 添加渠道弹窗 -->
+    <div class="modal" id="channelModal">
+        <div class="modal-content">
+            <div class="modal-header">添加支付渠道</div>
+            <form id="channelForm" onsubmit="saveChannel(event)">
+                <div class="form-group">
+                    <label>渠道名称 *</label>
+                    <input type="text" id="channelName" placeholder="例如: BOSSPAY, antpay" required>
+                    <div class="form-help">渠道名称，将与上传的文件名匹配（不区分大小写）</div>
+                </div>
+                <div class="form-group">
+                    <label>订单号列名 *</label>
+                    <input type="text" id="orderIdColumn" value="商户订单号" required>
+                    <div class="form-help">渠道文件中订单号的列名</div>
+                </div>
+                <div class="form-group">
+                    <label>金额列名 *</label>
+                    <input type="text" id="amountColumn" value="金额" required>
+                    <div class="form-help">渠道文件中金额的列名</div>
+                </div>
+                <div class="form-group">
+                    <label>状态列名 *</label>
+                    <input type="text" id="statusColumn" value="状态" required>
+                    <div class="form-help">渠道文件中状态的列名</div>
+                </div>
+                <div class="form-group">
+                    <label>成功状态值 *</label>
+                    <input type="text" id="successValues" value="成功,success,已完成,1" required>
+                    <div class="form-help">逗号分隔，匹配其中任一值即视为成功</div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeChannelModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 消息提示 -->
+    <div id="toast" style="display:none;position:fixed;top:20px;right:20px;background:#4caf50;color:white;padding:12px 24px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);z-index:2000;"></div>
 
     <script>
         console.log('[DEBUG] Script loaded, initializing...');
@@ -836,6 +1146,182 @@
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
+        }
+
+        // ==================== 配置管理功能 ====================
+
+        // 页面切换
+        function switchPage(page) {
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+            if (page === 'reconcile') {
+                document.querySelector('.nav-tab:nth-child(1)').classList.add('active');
+                document.getElementById('reconcilePage').classList.add('active');
+            } else {
+                document.querySelector('.nav-tab:nth-child(2)').classList.add('active');
+                document.getElementById('configPage').classList.add('active');
+                loadConfig(); // 加载配置
+            }
+        }
+
+        // 显示提示消息
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = isError ? '#f44336' : '#4caf50';
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // 加载配置
+        let fullConfig = null;
+        async function loadConfig() {
+            try {
+                const response = await fetch(API_BASE + '/api/v1/config');
+                const data = await response.json();
+
+                if (data.success) {
+                    fullConfig = data.config;
+                    // 填充完整配置编辑器
+                    document.getElementById('fullConfigEditor').value =
+                        JSON.stringify(fullConfig, null, 2);
+                    // 加载渠道列表
+                    loadChannelList();
+                } else {
+                    showToast('加载配置失败', true);
+                }
+            } catch (error) {
+                console.error('加载配置出错:', error);
+                showToast('加载配置出错: ' + error.message, true);
+            }
+        }
+
+        // 加载渠道列表
+        async function loadChannelList() {
+            try {
+                const response = await fetch(API_BASE + '/api/v1/config/channels');
+                const data = await response.json();
+
+                const channelList = document.getElementById('channelList');
+                if (data.success && data.channels.length > 0) {
+                    channelList.innerHTML = data.channels.map(ch => '' +
+                        '<div class="channel-item">' +
+                            '<div class="channel-info">' +
+                                '<div class="channel-name">' + ch.name + '</div>' +
+                                '<div class="channel-details">' +
+                                    '订单号: ' + ch.order_id_column + ' | ' +
+                                    '金额: ' + ch.amount_column + ' | ' +
+                                    '状态: ' + ch.status_column +
+                                '</div>' +
+                            '</div>' +
+                            '<button class="delete-btn" onclick="deleteChannel(\'' + ch.name + '\')">删除</button>' +
+                        '</div>'
+                    ).join('');
+                } else {
+                    channelList.innerHTML = '<div class="channel-item"><div class="channel-details">暂无配置的支付渠道</div></div>';
+                }
+            } catch (error) {
+                console.error('加载渠道列表出错:', error);
+            }
+        }
+
+        // 打开添加渠道弹窗
+        function openChannelModal() {
+            document.getElementById('channelModal').classList.add('active');
+        }
+
+        // 关闭添加渠道弹窗
+        function closeChannelModal() {
+            document.getElementById('channelModal').classList.remove('active');
+            document.getElementById('channelForm').reset();
+        }
+
+        // 保存渠道配置
+        async function saveChannel(event) {
+            event.preventDefault();
+
+            const formData = new FormData();
+            formData.append('channel_name', document.getElementById('channelName').value);
+            formData.append('order_id_column', document.getElementById('orderIdColumn').value);
+            formData.append('amount_column', document.getElementById('amountColumn').value);
+            formData.append('status_column', document.getElementById('statusColumn').value);
+            formData.append('success_values', document.getElementById('successValues').value);
+
+            try {
+                const response = await fetch(API_BASE + '/api/v1/config/channel', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(data.message);
+                    closeChannelModal();
+                    loadChannelList();
+                    loadConfig(); // 刷新完整配置
+                } else {
+                    showToast(data.message || '保存失败', true);
+                }
+            } catch (error) {
+                showToast('保存出错: ' + error.message, true);
+            }
+        }
+
+        // 删除渠道
+        async function deleteChannel(channelName) {
+            if (!confirm('确定要删除渠道 "' + channelName + '" 吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(API_BASE + '/api/v1/config/channel/' + channelName, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(data.message);
+                    loadChannelList();
+                    loadConfig(); // 刷新完整配置
+                } else {
+                    showToast(data.message || '删除失败', true);
+                }
+            } catch (error) {
+                showToast('删除出错: ' + error.message, true);
+            }
+        }
+
+        // 保存完整配置
+        async function saveFullConfig() {
+            const editor = document.getElementById('fullConfigEditor');
+            try {
+                const config = JSON.parse(editor.value);
+
+                const response = await fetch(API_BASE + '/api/v1/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(data.message);
+                    fullConfig = config;
+                } else {
+                    showToast(data.message || '保存失败', true);
+                }
+            } catch (error) {
+                if (error instanceof SyntaxError) {
+                    showToast('JSON 格式错误，请检查语法', true);
+                } else {
+                    showToast('保存出错: ' + error.message, true);
+                }
+            }
         }
     </script>
 </body>
