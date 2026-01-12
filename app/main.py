@@ -26,7 +26,7 @@ print("[INFO] Payment Reconciliation Service initialized")
 app = FastAPI(
     title="Payment Reconciliation API",
     description="LLM-driven intelligent payment reconciliation service",
-    version="1.0.0"
+    version="1.0.1"
 )
 
 # Add CORS middleware
