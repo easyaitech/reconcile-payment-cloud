@@ -786,12 +786,13 @@
                     html += '<table style="width: 100%; font-size: 12px; border-collapse: collapse;">';
                     html += '<tr style="background: #ffcdd2; position: sticky; top: 0;"><th style="padding: 6px; text-align: left;">订单号</th><th style="padding: 6px;">类型</th><th style="padding: 6px;">金额</th><th style="padding: 6px;">渠道</th></tr>';
                     missingInChannel.forEach((item, idx) => {
-                        html += `<tr style="${idx % 2 === 0 ? 'background: #ffebee;' : 'background: #fff;}">
-                            <td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">${item.order_id || 'N/A'}</td>
-                            <td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">${item.type === 'deposit' ? '充值' : '提款'}</td>
-                            <td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">¥${item.game_amount || 0}</td>
-                            <td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">${item.channel || '-'}</td>
-                        </tr>`;
+                        const rowClass = idx % 2 === 0 ? 'background: #ffebee;' : 'background: #fff;';
+                        html += '<tr style="' + rowClass + '">';
+                        html += '<td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">' + (item.order_id || 'N/A') + '</td>';
+                        html += '<td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">' + (item.type === 'deposit' ? '充值' : '提款') + '</td>';
+                        html += '<td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">¥' + (item.game_amount || 0) + '</td>';
+                        html += '<td style="padding: 6px; border-bottom: 1px solid #ffcdd2;">' + (item.channel || '-') + '</td>';
+                        html += '</tr>';
                     });
                     html += '</table></div></div>';
                 }
@@ -804,13 +805,14 @@
                     html += '<table style="width: 100%; font-size: 12px; border-collapse: collapse;">';
                     html += '<tr style="background: #ffe0b2; position: sticky; top: 0;"><th style="padding: 6px; text-align: left;">订单号</th><th style="padding: 6px;">类型</th><th style="padding: 6px;">游戏金额</th><th style="padding: 6px;">渠道金额</th><th style="padding: 6px;">差异</th></tr>';
                     amountMismatch.forEach((item, idx) => {
-                        html += `<tr style="${idx % 2 === 0 ? 'background: #fff3e0;' : 'background: #fff;}">
-                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">${item.order_id || 'N/A'}</td>
-                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">${item.type === 'deposit' ? '充值' : '提款'}</td>
-                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">¥${item.game_amount || 0}</td>
-                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">¥${item.channel_amount || 0}</td>
-                            <td style="padding: 6px; border-bottom: 1px solid #ffe0b2; color: #f44336;">¥${item.diff || 0}</td>
-                        </tr>`;
+                        const rowClass = idx % 2 === 0 ? 'background: #fff3e0;' : 'background: #fff;';
+                        html += '<tr style="' + rowClass + '">';
+                        html += '<td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">' + (item.order_id || 'N/A') + '</td>';
+                        html += '<td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">' + (item.type === 'deposit' ? '充值' : '提款') + '</td>';
+                        html += '<td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">¥' + (item.game_amount || 0) + '</td>';
+                        html += '<td style="padding: 6px; border-bottom: 1px solid #ffe0b2;">¥' + (item.channel_amount || 0) + '</td>';
+                        html += '<td style="padding: 6px; border-bottom: 1px solid #ffe0b2; color: #f44336;">¥' + (item.diff || 0) + '</td>';
+                        html += '</tr>';
                     });
                     html += '</table></div></div>';
                 }
