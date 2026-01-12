@@ -707,36 +707,25 @@
             <div class="config-section">
                 <div class="config-header">
                     <h3>游戏供应商配置</h3>
+                    <button class="add-btn" onclick="openSupplierModal()">+ 添加供应商</button>
                 </div>
-                <div class="channel-item">
-                    <div class="channel-info">
-                        <div class="channel-name">RED (默认)</div>
-                        <div class="channel-details">订单编号 | 支付渠道 | 状态 | 实际金额</div>
+                <div class="channel-list" id="supplierList">
+                    <div class="channel-item">
+                        <div class="channel-info">
+                            <div class="channel-details">正在加载...</div>
+                        </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- 完整配置编辑 -->
-            <div class="config-section">
-                <div class="config-header">
-                    <h3>完整配置 (JSON)</h3>
-                    <button class="add-btn" onclick="saveFullConfig()">保存配置</button>
-                </div>
-                <div class="config-editor">
-                    <textarea id="fullConfigEditor" placeholder="加载中..."></textarea>
-                </div>
-                <div class="form-help" style="margin-top: 10px;">
-                    提示：可以直接编辑上面的 JSON 配置，然后点击"保存配置"按钮。修改后立即生效。
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 添加渠道弹窗 -->
+    <!-- 渠道弹窗 (添加/编辑) -->
     <div class="modal" id="channelModal">
         <div class="modal-content">
-            <div class="modal-header">添加支付渠道</div>
+            <div class="modal-header" id="channelModalTitle">添加支付渠道</div>
             <form id="channelForm" onsubmit="saveChannel(event)">
+                <input type="hidden" id="editingChannel" value="">
                 <div class="form-group">
                     <label>渠道名称 *</label>
                     <input type="text" id="channelName" placeholder="例如: BOSSPAY, antpay" required>
@@ -764,6 +753,54 @@
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeChannelModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 供应商弹窗 (添加/编辑) -->
+    <div class="modal" id="supplierModal">
+        <div class="modal-content">
+            <div class="modal-header" id="supplierModalTitle">添加游戏供应商</div>
+            <form id="supplierForm" onsubmit="saveSupplier(event)">
+                <input type="hidden" id="editingSupplier" value="">
+                <div class="form-group">
+                    <label>供应商名称 *</label>
+                    <input type="text" id="supplierName" placeholder="例如: RED" required>
+                    <div class="form-help">供应商名称，用于标识游戏平台</div>
+                </div>
+                <div class="form-group">
+                    <label>订单号列名 *</label>
+                    <input type="text" id="supplierOrderIdColumn" value="订单编号" required>
+                    <div class="form-help">游戏文件中订单号的列名</div>
+                </div>
+                <div class="form-group">
+                    <label>支付渠道列名 *</label>
+                    <input type="text" id="supplierChannelColumn" value="支付渠道" required>
+                    <div class="form-help">游戏文件中支付渠道的列名</div>
+                </div>
+                <div class="form-group">
+                    <label>状态列名 *</label>
+                    <input type="text" id="supplierStatusColumn" value="状态" required>
+                    <div class="form-help">游戏文件中状态的列名</div>
+                </div>
+                <div class="form-group">
+                    <label>金额列名 *</label>
+                    <input type="text" id="supplierAmountColumn" value="实际金额" required>
+                    <div class="form-help">游戏文件中金额的列名</div>
+                </div>
+                <div class="form-group">
+                    <label>金额单位 *</label>
+                    <select id="supplierCurrencyUnit" required>
+                        <option value="个位">个位（元）</option>
+                        <option value="百位">百位（百元）</option>
+                        <option value="千位">千位（千元）</option>
+                    </select>
+                    <div class="form-help">金额的单位，例如金额是10000元，个位表示10000元，千位表示10千元</div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeSupplierModal()">取消</button>
                     <button type="submit" class="btn btn-primary">保存</button>
                 </div>
             </form>
@@ -1150,6 +1187,10 @@
 
         // ==================== 配置管理功能 ====================
 
+        // 存储渠道和供应商数据
+        let channelsData = [];
+        let suppliersData = [];
+
         // 页面切换
         function switchPage(page) {
             document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
@@ -1161,7 +1202,8 @@
             } else {
                 document.querySelector('.nav-tab:nth-child(2)').classList.add('active');
                 document.getElementById('configPage').classList.add('active');
-                loadConfig(); // 加载配置
+                loadChannelList();
+                loadSupplierList();
             }
         }
 
@@ -1176,28 +1218,7 @@
             }, 3000);
         }
 
-        // 加载配置
-        let fullConfig = null;
-        async function loadConfig() {
-            try {
-                const response = await fetch(API_BASE + '/api/v1/config');
-                const data = await response.json();
-
-                if (data.success) {
-                    fullConfig = data.config;
-                    // 填充完整配置编辑器
-                    document.getElementById('fullConfigEditor').value =
-                        JSON.stringify(fullConfig, null, 2);
-                    // 加载渠道列表
-                    loadChannelList();
-                } else {
-                    showToast('加载配置失败', true);
-                }
-            } catch (error) {
-                console.error('加载配置出错:', error);
-                showToast('加载配置出错: ' + error.message, true);
-            }
-        }
+        // ==================== 支付渠道管理 ====================
 
         // 加载渠道列表
         async function loadChannelList() {
@@ -1207,6 +1228,7 @@
 
                 const channelList = document.getElementById('channelList');
                 if (data.success && data.channels.length > 0) {
+                    channelsData = data.channels;
                     channelList.innerHTML = data.channels.map(ch => '' +
                         '<div class="channel-item">' +
                             '<div class="channel-info">' +
@@ -1217,7 +1239,10 @@
                                     '状态: ' + ch.status_column +
                                 '</div>' +
                             '</div>' +
-                            '<button class="delete-btn" onclick="deleteChannel(\'' + ch.name + '\')">删除</button>' +
+                            '<div style="display:flex;gap:8px;">' +
+                                '<button class="add-btn" style="background:#667eea;padding:6px 12px;font-size:12px;" onclick="editChannel(\'' + ch.name + '\')">编辑</button>' +
+                                '<button class="delete-btn" onclick="deleteChannel(\'' + ch.name + '\')">删除</button>' +
+                            '</div>' +
                         '</div>'
                     ).join('');
                 } else {
@@ -1230,13 +1255,40 @@
 
         // 打开添加渠道弹窗
         function openChannelModal() {
+            document.getElementById('editingChannel').value = '';
+            document.getElementById('channelModalTitle').textContent = '添加支付渠道';
+            document.getElementById('channelName').value = '';
+            document.getElementById('channelName').disabled = false;
+            document.getElementById('orderIdColumn').value = '商户订单号';
+            document.getElementById('amountColumn').value = '金额';
+            document.getElementById('statusColumn').value = '状态';
+            document.getElementById('successValues').value = '成功,success,已完成,1';
             document.getElementById('channelModal').classList.add('active');
         }
 
-        // 关闭添加渠道弹窗
+        // 编辑渠道
+        function editChannel(channelName) {
+            const channel = channelsData.find(c => c.name === channelName);
+            if (!channel) return;
+
+            document.getElementById('editingChannel').value = channelName;
+            document.getElementById('channelModalTitle').textContent = '编辑支付渠道';
+            document.getElementById('channelName').value = channelName;
+            document.getElementById('channelName').disabled = true; // 编辑时不允许改名
+            document.getElementById('orderIdColumn').value = channel.order_id_column;
+            document.getElementById('amountColumn').value = channel.amount_column;
+            document.getElementById('statusColumn').value = channel.status_column;
+            document.getElementById('successValues').value = Array.isArray(channel.success_values)
+                ? channel.success_values.join(',')
+                : channel.success_values;
+            document.getElementById('channelModal').classList.add('active');
+        }
+
+        // 关闭渠道弹窗
         function closeChannelModal() {
             document.getElementById('channelModal').classList.remove('active');
             document.getElementById('channelForm').reset();
+            document.getElementById('editingChannel').value = '';
         }
 
         // 保存渠道配置
@@ -1261,7 +1313,6 @@
                     showToast(data.message);
                     closeChannelModal();
                     loadChannelList();
-                    loadConfig(); // 刷新完整配置
                 } else {
                     showToast(data.message || '保存失败', true);
                 }
@@ -1285,7 +1336,6 @@
                 if (data.success) {
                     showToast(data.message);
                     loadChannelList();
-                    loadConfig(); // 刷新完整配置
                 } else {
                     showToast(data.message || '删除失败', true);
                 }
@@ -1294,33 +1344,131 @@
             }
         }
 
-        // 保存完整配置
-        async function saveFullConfig() {
-            const editor = document.getElementById('fullConfigEditor');
-            try {
-                const config = JSON.parse(editor.value);
+        // ==================== 游戏供应商管理 ====================
 
-                const response = await fetch(API_BASE + '/api/v1/config', {
+        // 加载供应商列表
+        async function loadSupplierList() {
+            try {
+                const response = await fetch(API_BASE + '/api/v1/config/suppliers');
+                const data = await response.json();
+
+                const supplierList = document.getElementById('supplierList');
+                if (data.success && data.suppliers.length > 0) {
+                    suppliersData = data.suppliers;
+                    supplierList.innerHTML = data.suppliers.map(s => '' +
+                        '<div class="channel-item">' +
+                            '<div class="channel-info">' +
+                                '<div class="channel-name">' + s.name + '</div>' +
+                                '<div class="channel-details">' +
+                                    '订单号: ' + s.order_id_column + ' | ' +
+                                    '渠道: ' + s.channel_column + ' | ' +
+                                    '状态: ' + s.status_column + ' | ' +
+                                    '金额: ' + s.amount_column + ' (' + s.currency_unit + ')' +
+                                '</div>' +
+                            '</div>' +
+                            '<div style="display:flex;gap:8px;">' +
+                                '<button class="add-btn" style="background:#667eea;padding:6px 12px;font-size:12px;" onclick="editSupplier(\'' + s.name + '\')">编辑</button>' +
+                                '<button class="delete-btn" onclick="deleteSupplier(\'' + s.name + '\')">删除</button>' +
+                            '</div>' +
+                        '</div>'
+                    ).join('');
+                } else {
+                    supplierList.innerHTML = '<div class="channel-item"><div class="channel-details">暂无配置的游戏供应商</div></div>';
+                }
+            } catch (error) {
+                console.error('加载供应商列表出错:', error);
+            }
+        }
+
+        // 打开添加供应商弹窗
+        function openSupplierModal() {
+            document.getElementById('editingSupplier').value = '';
+            document.getElementById('supplierModalTitle').textContent = '添加游戏供应商';
+            document.getElementById('supplierName').value = '';
+            document.getElementById('supplierName').disabled = false;
+            document.getElementById('supplierOrderIdColumn').value = '订单编号';
+            document.getElementById('supplierChannelColumn').value = '支付渠道';
+            document.getElementById('supplierStatusColumn').value = '状态';
+            document.getElementById('supplierAmountColumn').value = '实际金额';
+            document.getElementById('supplierCurrencyUnit').value = '个位';
+            document.getElementById('supplierModal').classList.add('active');
+        }
+
+        // 编辑供应商
+        function editSupplier(supplierName) {
+            const supplier = suppliersData.find(s => s.name === supplierName);
+            if (!supplier) return;
+
+            document.getElementById('editingSupplier').value = supplierName;
+            document.getElementById('supplierModalTitle').textContent = '编辑游戏供应商';
+            document.getElementById('supplierName').value = supplier.name;
+            document.getElementById('supplierName').disabled = true; // 编辑时不允许改名
+            document.getElementById('supplierOrderIdColumn').value = supplier.order_id_column;
+            document.getElementById('supplierChannelColumn').value = supplier.channel_column;
+            document.getElementById('supplierStatusColumn').value = supplier.status_column;
+            document.getElementById('supplierAmountColumn').value = supplier.amount_column;
+            document.getElementById('supplierCurrencyUnit').value = supplier.currency_unit;
+            document.getElementById('supplierModal').classList.add('active');
+        }
+
+        // 关闭供应商弹窗
+        function closeSupplierModal() {
+            document.getElementById('supplierModal').classList.remove('active');
+            document.getElementById('supplierForm').reset();
+            document.getElementById('editingSupplier').value = '';
+        }
+
+        // 保存供应商配置
+        async function saveSupplier(event) {
+            event.preventDefault();
+
+            const formData = new FormData();
+            formData.append('name', document.getElementById('supplierName').value);
+            formData.append('order_id_column', document.getElementById('supplierOrderIdColumn').value);
+            formData.append('channel_column', document.getElementById('supplierChannelColumn').value);
+            formData.append('status_column', document.getElementById('supplierStatusColumn').value);
+            formData.append('amount_column', document.getElementById('supplierAmountColumn').value);
+            formData.append('currency_unit', document.getElementById('supplierCurrencyUnit').value);
+
+            try {
+                const response = await fetch(API_BASE + '/api/v1/config/supplier', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(config)
+                    body: formData
                 });
                 const data = await response.json();
 
                 if (data.success) {
                     showToast(data.message);
-                    fullConfig = config;
+                    closeSupplierModal();
+                    loadSupplierList();
                 } else {
                     showToast(data.message || '保存失败', true);
                 }
             } catch (error) {
-                if (error instanceof SyntaxError) {
-                    showToast('JSON 格式错误，请检查语法', true);
+                showToast('保存出错: ' + error.message, true);
+            }
+        }
+
+        // 删除供应商
+        async function deleteSupplier(supplierName) {
+            if (!confirm('确定要删除供应商 "' + supplierName + '" 吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(API_BASE + '/api/v1/config/supplier/' + supplierName, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast(data.message);
+                    loadSupplierList();
                 } else {
-                    showToast('保存出错: ' + error.message, true);
+                    showToast(data.message || '删除失败', true);
                 }
+            } catch (error) {
+                showToast('删除出错: ' + error.message, true);
             }
         }
     </script>

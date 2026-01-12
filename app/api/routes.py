@@ -366,3 +366,146 @@ async def get_channels():
         return {"success": True, "channels": channels}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取渠道列表失败: {str(e)}")
+
+
+# ==================== 游戏供应商管理 API ====================
+
+@router.get("/config/suppliers")
+async def get_suppliers():
+    """
+    获取所有游戏供应商列表
+
+    Returns:
+        {
+            "success": true,
+            "suppliers": [
+                {"name": "RED", "order_id_column": "订单编号", ...},
+                ...
+            ]
+        }
+    """
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+
+        suppliers = []
+        for item in config.get("游戏供应商配置", {}).get("供应商列表", []):
+            suppliers.append({
+                "name": item.get("name", ""),
+                "order_id_column": item.get("order_id_column", "订单编号"),
+                "channel_column": item.get("channel_column", "支付渠道"),
+                "status_column": item.get("status_column", "状态"),
+                "amount_column": item.get("amount_column", "实际金额"),
+                "currency_unit": item.get("currency_unit", "个位")
+            })
+
+        return {"success": True, "suppliers": suppliers}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取供应商列表失败: {str(e)}")
+
+
+@router.post("/config/supplier")
+async def add_or_update_supplier(
+    name: str = Form(...),
+    order_id_column: str = Form("订单编号"),
+    channel_column: str = Form("支付渠道"),
+    status_column: str = Form("状态"),
+    amount_column: str = Form("实际金额"),
+    currency_unit: str = Form("个位")
+):
+    """
+    添加或更新游戏供应商配置
+
+    Args:
+        name: 供应商名称 (如: RED)
+        order_id_column: 订单号列名
+        channel_column: 渠道列名
+        status_column: 状态列名
+        amount_column: 金额列名
+        currency_unit: 金额单位 (个位/百位/千位)
+
+    Returns:
+        {
+            "success": true,
+            "message": "供应商配置已保存"
+        }
+    """
+    try:
+        # 读取现有配置
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+
+        # 确保配置结构存在
+        if "游戏供应商配置" not in config:
+            config["游戏供应商配置"] = {}
+        if "供应商列表" not in config["游戏供应商配置"]:
+            config["游戏供应商配置"]["供应商列表"] = []
+
+        # 查找是否已存在同名供应商
+        suppliers = config["游戏供应商配置"]["供应商列表"]
+        existing_index = None
+        for i, s in enumerate(suppliers):
+            if s.get("name") == name:
+                existing_index = i
+                break
+
+        new_supplier = {
+            "name": name,
+            "order_id_column": order_id_column,
+            "channel_column": channel_column,
+            "status_column": status_column,
+            "amount_column": amount_column,
+            "currency_unit": currency_unit
+        }
+
+        if existing_index is not None:
+            # 更新现有供应商
+            suppliers[existing_index] = new_supplier
+        else:
+            # 添加新供应商
+            suppliers.append(new_supplier)
+
+        # 写回文件
+        with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+
+        action = "更新" if existing_index is not None else "添加"
+        return {"success": True, "message": f"供应商 {name} {action}成功"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存供应商配置失败: {str(e)}")
+
+
+@router.delete("/config/supplier/{supplier_name}")
+async def delete_supplier(supplier_name: str):
+    """
+    删除游戏供应商配置
+
+    Args:
+        supplier_name: 供应商名称
+
+    Returns:
+        {
+            "success": true,
+            "message": "供应商已删除"
+        }
+    """
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+
+        suppliers = config.get("游戏供应商配置", {}).get("供应商列表", [])
+
+        # 查找并删除
+        original_length = len(suppliers)
+        suppliers[:] = [s for s in suppliers if s.get("name") != supplier_name]
+
+        if len(suppliers) < original_length:
+            with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            return {"success": True, "message": f"供应商 {supplier_name} 已删除"}
+        else:
+            raise HTTPException(status_code=404, detail=f"供应商 {supplier_name} 不存在")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除供应商失败: {str(e)}")
